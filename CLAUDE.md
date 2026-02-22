@@ -14,10 +14,14 @@ No test suite — manual smoke-testing against the live Reddit API is the primar
 
 Env vars: `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT` (optional, default `reddit-cli/1.0`).
 
-Resolution order (highest → lowest):
-1. Shell environment variables
+Resolution order (highest → lowest) — stops at first file that sets the var:
+1. Shell environment variables (already exported)
 2. `~/.config/reddit-cli/.env` (dotenv format, no `export` needed)
-3. `~/.secrets` (shell export format, loaded via dotenv)
+3. `~/.secrets`
+4. `~/.zshenv`, `~/.zshrc`, `~/.zprofile`
+5. `~/.profile`, `~/.bash_profile`, `~/.bashrc`, `~/.env`
+
+`load_dotenv` handles `export KEY=value` syntax and silently skips unparseable lines (functions, conditionals). Full list in `auth._CREDENTIAL_FILES`.
 
 ## Architecture
 

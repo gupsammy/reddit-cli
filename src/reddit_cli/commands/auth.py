@@ -2,7 +2,7 @@
 
 import sys
 
-from ..auth import get_client, _CONFIG_PATH
+from ..auth import get_client, _CREDENTIAL_FILES
 
 
 def run(_args) -> int:
@@ -27,5 +27,5 @@ def run(_args) -> int:
     else:
         print("Read-only credentials OK (no username — script app without login)")
 
-    print(f"Config: {_CONFIG_PATH}")
+    print(f"Config: {_CREDENTIAL_FILES[0]}")
     return 0

@@ -7,8 +7,20 @@ from pathlib import Path
 import praw
 from dotenv import load_dotenv
 
-_CONFIG_PATH = Path.home() / ".config" / "reddit-cli" / ".env"
-_SECRETS_PATH = Path.home() / ".secrets"
+_H = Path.home()
+
+# Searched in order; first file that provides REDDIT_CLIENT_ID wins.
+_CREDENTIAL_FILES = [
+    _H / ".config" / "reddit-cli" / ".env",  # explicit config (highest priority)
+    _H / ".secrets",                          # common secrets file
+    _H / ".zshenv",                           # zsh — all sessions, incl. non-interactive
+    _H / ".zshrc",                            # zsh — interactive (macOS default shell)
+    _H / ".zprofile",                         # zsh — login shell
+    _H / ".profile",                          # POSIX fallback
+    _H / ".bash_profile",                     # bash — login shell
+    _H / ".bashrc",                           # bash — interactive
+    _H / ".env",                              # bare dotenv convention
+]
 
 _AUTH_HELP = """\
 Error: Missing REDDIT_CLIENT_ID or REDDIT_CLIENT_SECRET.
@@ -16,9 +28,9 @@ Error: Missing REDDIT_CLIENT_ID or REDDIT_CLIENT_SECRET.
 Create a Reddit app (script type, read-only is fine) at:
   https://www.reddit.com/prefs/apps
 
-Then add credentials to ~/.config/reddit-cli/.env or ~/.secrets:
-  export REDDIT_CLIENT_ID=your_client_id
-  export REDDIT_CLIENT_SECRET=your_client_secret
+Then export credentials in any of the usual places:
+  ~/.config/reddit-cli/.env  (dotenv format, recommended)
+  ~/.secrets / ~/.zshenv / ~/.zshrc / ~/.profile  (export KEY=value lines)
 
 Or export them as environment variables before running reddit-cli.
 """
@@ -28,18 +40,18 @@ def load_credentials() -> tuple[str, str, str]:
     """Return (client_id, client_secret, user_agent), exiting on error.
 
     Precedence (highest → lowest):
-      1. Env vars already in the shell (e.g. sourced from ~/.secrets via zshrc)
-      2. ~/.config/reddit-cli/.env  (dotenv format, no export needed)
-      3. ~/.secrets                 (shell export format, loaded as dotenv)
+      1. Env vars already exported in the shell
+      2–10. Files in _CREDENTIAL_FILES order (stops at first file that sets the var)
+
+    load_dotenv handles both plain KEY=value and shell `export KEY=value` syntax,
+    and silently skips lines it cannot parse (functions, conditionals, etc.).
     """
-    # Only load dotenv files if the env vars aren't already set, so that
-    # values already exported by the shell (via zshrc → source ~/.secrets)
-    # always win.
     if not os.getenv("REDDIT_CLIENT_ID"):
-        if _CONFIG_PATH.exists():
-            load_dotenv(_CONFIG_PATH)
-        if not os.getenv("REDDIT_CLIENT_ID") and _SECRETS_PATH.exists():
-            load_dotenv(_SECRETS_PATH)
+        for path in _CREDENTIAL_FILES:
+            if path.exists():
+                load_dotenv(path)
+            if os.getenv("REDDIT_CLIENT_ID"):
+                break
 
     client_id = os.getenv("REDDIT_CLIENT_ID", "").strip()
     client_secret = os.getenv("REDDIT_CLIENT_SECRET", "").strip()
