@@ -1,0 +1,19 @@
+[project]
+name = "reddit-cli"
+version = "1.0.0"
+description = "Search Reddit via PRAW — drop-in replacement for OpenAI-based Reddit search"
+requires-python = ">=3.11"
+dependencies = [
+    "praw>=7.7",
+    "python-dotenv>=1.0",
+]
+
+[project.scripts]
+reddit-cli = "reddit_cli.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/reddit_cli"]
