@@ -1,4 +1,4 @@
-"""reddit-cli subreddits — find subreddits by name or description."""
+"""reddit-cli subreddits — find subreddits by name or description, or browse popular ones."""
 
 import sys
 
@@ -14,17 +14,22 @@ def run(args) -> int:
     reddit = get_client()
 
     if not args.quiet:
-        sys.stderr.write(f"[subreddits] q={args.query!r} by={args.by} limit={args.limit}\n")
+        if args.popular or not args.query:
+            sys.stderr.write(f"[subreddits] popular limit={args.limit}\n")
+        else:
+            sys.stderr.write(f"[subreddits] q={args.query!r} by={args.by} limit={args.limit}\n")
         sys.stderr.flush()
 
     try:
-        if args.by == "name":
-            results = reddit.subreddits.search_by_name(args.query, include_nsfw=False)
+        if args.popular or not args.query:
+            source = reddit.subreddits.popular(limit=args.limit)
+        elif args.by == "name":
+            source = reddit.subreddits.search_by_name(args.query, include_nsfw=False)
         else:
-            results = reddit.subreddits.search(args.query)
+            source = reddit.subreddits.search(args.query)
 
         items = []
-        for sub in results:
+        for sub in source:
             items.append(subreddit_to_dict(sub))
             if len(items) >= args.limit:
                 break

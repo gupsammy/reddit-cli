@@ -1,6 +1,6 @@
 [project]
 name = "reddit-cli"
-version = "1.0.0"
+version = "1.1.0"
 description = "Search Reddit via PRAW — drop-in replacement for OpenAI-based Reddit search"
 requires-python = ">=3.11"
 dependencies = [

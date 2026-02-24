@@ -20,40 +20,51 @@ def _extract_id(id_or_url: str) -> str:
     return id_or_url.strip()
 
 
-def _collect_comments(submission, limit: int, min_score: int) -> list[dict]:
-    """Collect top-level comments, sorted by score, respecting limit and min_score."""
+def _recurse(comment_forest, depth_remaining: int, current_depth: int, min_score: int, acc: list) -> None:
+    """Recursively collect comments up to depth_remaining levels deep."""
+    for comment in comment_forest:
+        if isinstance(comment, MoreComments):
+            continue
+        d = comment_to_dict(comment, depth=current_depth)
+        if d is None:
+            continue
+        if d["score"] >= min_score:
+            acc.append(d)
+        if depth_remaining > 0 and hasattr(comment, "replies"):
+            _recurse(comment.replies, depth_remaining - 1, current_depth + 1, min_score, acc)
+
+
+def _collect_comments(submission, limit: int, min_score: int, depth: int) -> list[dict]:
+    """Collect comments with optional nested reply traversal."""
     try:
         submission.comments.replace_more(limit=0)
     except Exception:
         pass
 
-    items = []
-    for comment in submission.comments:
-        if isinstance(comment, MoreComments):
-            continue
-        d = comment_to_dict(comment, depth=0)
-        if d is None:
-            continue
-        if d["score"] < min_score:
-            continue
-        items.append(d)
+    items: list[dict] = []
+    _recurse(submission.comments, depth, 0, min_score, items)
 
-    # Sort by score descending, then cap
-    items.sort(key=lambda c: c["score"], reverse=True)
+    # For top-level-only (depth=0), sort by score and cap at limit.
+    # For nested traversal, preserve tree order but still cap total count.
+    if depth == 0:
+        items.sort(key=lambda c: c["score"], reverse=True)
     return items[:limit]
 
 
 def run(args) -> int:
     reddit = get_client()
     sub_id = _extract_id(args.id_or_url)
+    depth = getattr(args, "depth", 0)
 
     if not args.quiet:
-        sys.stderr.write(f"[comments] id={sub_id} limit={args.limit} min_score={args.min_score}\n")
+        sys.stderr.write(
+            f"[comments] id={sub_id} limit={args.limit} min_score={args.min_score} depth={depth}\n"
+        )
         sys.stderr.flush()
 
     try:
         submission = reddit.submission(sub_id)
-        items = _collect_comments(submission, args.limit, args.min_score)
+        items = _collect_comments(submission, args.limit, args.min_score, depth)
     except Exception as e:
         sys.stderr.write(f"Error: Could not fetch comments for {sub_id!r} — {e}\n")
         return 1

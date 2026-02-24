@@ -1,5 +1,6 @@
-"""Rendering helpers: compact lines and JSON output."""
+"""Rendering helpers: compact lines, JSON, and CSV output."""
 
+import csv
 import json
 import os
 import sys
@@ -67,6 +68,20 @@ def print_posts_compact(items: list[dict]) -> None:
 def print_posts_json(items: list[dict]) -> None:
     # Schema matches last30days openai_reddit parser expectations
     print(json.dumps({"items": items}, indent=2))
+
+
+_CSV_FIELDS = ["id", "title", "score", "num_comments", "upvote_ratio", "author", "date", "subreddit", "url"]
+
+
+def print_posts_csv(items: list[dict]) -> None:
+    writer = csv.DictWriter(
+        sys.stdout,
+        fieldnames=_CSV_FIELDS,
+        extrasaction="ignore",
+        lineterminator="\n",
+    )
+    writer.writeheader()
+    writer.writerows(items)
 
 
 # ---------------------------------------------------------------------------

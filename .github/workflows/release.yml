@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            platform: darwin
+            arch: arm64
+          - os: macos-13
+            platform: darwin
+            arch: x86_64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x86_64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pyinstaller
+          pip install -e .
+
+      - name: Build binary
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          pyinstaller \
+            --onefile \
+            --name "reddit-cli-${PLATFORM}-${ARCH}" \
+            --collect-all praw \
+            --collect-all urllib3 \
+            --collect-all certifi \
+            --collect-all charset_normalizer \
+            --hidden-import dotenv \
+            --hidden-import praw.models \
+            --hidden-import praw.models.reddit \
+            --hidden-import praw.models.reddit.more \
+            src/reddit_cli/main.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reddit-cli-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/reddit-cli-${{ matrix.platform }}-${{ matrix.arch }}
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - name: Flatten artifact directories
+        run: find dist/ -type f -name 'reddit-cli-*' -exec mv {} dist/ \; && find dist/ -type d -empty -delete
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/reddit-cli-darwin-arm64
+            dist/reddit-cli-darwin-x86_64
+            dist/reddit-cli-linux-x86_64
+          generate_release_notes: true
+          fail_on_unmatched_files: true

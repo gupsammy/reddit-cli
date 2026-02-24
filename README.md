@@ -2,7 +2,7 @@
 
 <h1>reddit-cli</h1>
 
-<p>Search Reddit posts, subreddits, and threads from the terminal — no OpenAI required.</p>
+<p>Search Reddit posts, browse subreddits, and read threads from the terminal — no OpenAI required.</p>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/github/v/release/gupsammy/reddit-cli?label=version)](https://github.com/gupsammy/reddit-cli/releases)
@@ -11,22 +11,38 @@
 
 ---
 
-`reddit-cli` is a fast, pipe-friendly command-line tool that searches Reddit via [PRAW](https://praw.readthedocs.io). It was built as a drop-in replacement for OpenAI-based Reddit search workflows — same compact or JSON output, zero LLM dependency. Useful for researchers, developers, and anyone who wants to query Reddit programmatically without a browser.
+`reddit-cli` is a fast, pipe-friendly command-line tool that queries Reddit via [PRAW](https://praw.readthedocs.io). It was built as a drop-in replacement for OpenAI-based Reddit search workflows — same compact or JSON output, zero LLM dependency. Useful for researchers, developers, and anyone who wants to query Reddit programmatically without a browser.
 
-## Features
+## ✨ Features
 
+- **8 commands** covering every common Reddit access pattern: search, feed, user, domain, subreddits, post, comments, and auth
 - Search posts across all of Reddit or a specific subreddit, with flexible sort and time filters
-- Find subreddits by name or description
-- Fetch a single post by ID or full URL, with optional self-text body
-- Read comments from any thread with minimum-score filtering
-- Two output modes: **compact** (human-readable) and **json** (pipe-friendly, `{"items": [...]}` schema)
-- `--enrich` flag adds post body and top 5 comments per search result
-- Color output auto-disables in pipes; also controllable via `--no-color` or `NO_COLOR`
+- Browse a subreddit's live listing by hot, new, rising, top, or controversial
+- Fetch a redditor's recent posts or comment history
+- Find all Reddit posts linking to any domain (great for tracking OSS project discussions)
+- Discover subreddits by name, description, or popularity
+- Read threaded comments with depth traversal and minimum-score filtering
+- Three output modes: **compact** (human-readable), **json** (`{"items": [...]}` schema), **csv** (pipe to `xsv`, `mlr`)
+- `--enrich` fetches post body + top N comments per search result
+- Color auto-disables in pipes; controllable via `--no-color` or `NO_COLOR`
 - Structured exit codes: `0` success · `1` API error · `2` usage error · `3` auth error
 
-## Installation
+## 🚀 Quick Start
 
-**Prerequisites:** Python 3.11+
+**One-line install** (macOS and Linux):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gupsammy/reddit-cli/main/install.sh | bash
+```
+
+This downloads a pre-built binary to `~/.local/bin/reddit-cli`. No Python installation required. Pre-built binaries for macOS (arm64, x86_64) and Linux (x86_64) are available on the [Releases page](https://github.com/gupsammy/reddit-cli/releases).
+
+> **macOS Gatekeeper:** On first run, macOS may block the unsigned binary. Run once to allow it:
+> ```bash
+> xattr -d com.apple.quarantine ~/.local/bin/reddit-cli
+> ```
+
+**Install from source** (Python 3.11+ required):
 
 ```bash
 git clone https://github.com/gupsammy/reddit-cli.git
@@ -34,70 +50,75 @@ cd reddit-cli
 pip install -e .
 ```
 
-Then verify credentials are wired up:
+**Verify credentials:**
 
 ```bash
 reddit-cli auth
 ```
 
-## Usage
+## 💻 Usage
 
 ```bash
 # Search posts (defaults: r/all, sort=top, last 30 days, 25 results)
 reddit-cli search "Claude Code"
 
-# Narrow to a subreddit, week window, JSON output
+# Narrow to a subreddit, 7-day window, JSON output
 reddit-cli search "prompt engineering" -s LocalLLaMA --days 7 --output json
 
-# Fetch post body + top comments per result
+# Fetch post body + top 5 comments per result
 reddit-cli search "Midjourney v7" --days 7 --enrich --output json
 
-# Find subreddits matching a topic
+# Browse r/python's hot feed
+reddit-cli feed python --sort hot -n 10
+
+# Browse front page, top posts today, CSV output
+reddit-cli feed all --sort top --time day --output csv
+
+# Get a redditor's recent posts
+reddit-cli user spez --what posts --sort new -n 10
+
+# Find all Reddit discussions linking to a domain
+reddit-cli domain github.com --sort top --time week
+
+# Discover subreddits matching a topic
 reddit-cli subreddits "AI coding tools" --by description
 
-# Read a specific post
+# List currently popular subreddits
+reddit-cli subreddits --popular -n 10
+
+# Read a specific post by ID or URL
 reddit-cli post 1abc2de
 
-# Read top comments, minimum 10 upvotes
-reddit-cli comments 1abc2de --min-score 10
+# Read comments with nested replies (2 levels), min 10 upvotes
+reddit-cli comments 1abc2de --min-score 10 --depth 2
 
 # Pipe JSON results to jq
 reddit-cli search "python" --output json --quiet | jq '.items[].title'
 ```
 
-## Configuration
+## ⚙️ Configuration
 
-Credential resolution order (highest → lowest precedence):
+`reddit-cli` needs a Reddit "script" app — create one (read-only scope is sufficient) at [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps).
 
-| Source | Format | Path |
-|--------|--------|------|
-| Shell environment | `export VAR=val` | Inherited from shell |
-| Config file | dotenv (`KEY=val`, no `export`) | `~/.config/reddit-cli/.env` |
-| Secrets file | shell export format | `~/.secrets` |
+**Credential variables:**
 
 | Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
+|---|---|---|---|
 | `REDDIT_CLIENT_ID` | Yes | — | Client ID from Reddit app settings |
 | `REDDIT_CLIENT_SECRET` | Yes | — | Client secret from Reddit app settings |
-| `REDDIT_USER_AGENT` | No | `reddit-cli/1.0` | User-agent string sent to Reddit API |
+| `REDDIT_USER_AGENT` | No | `reddit-cli/1.0` | User-agent string sent to the Reddit API |
 
-Create a Reddit "script" app (read-only scope is sufficient) at https://www.reddit.com/prefs/apps to obtain credentials.
+**Resolution order** (first file that sets the variable wins):
 
-**Color control:** Set `REDDIT_CLI_NO_COLOR=1` or the standard `NO_COLOR` env var to disable ANSI output unconditionally. Color is also automatically suppressed when stdout is not a TTY.
+| Priority | Source | Path / format |
+|---|---|---|
+| 1 | Shell environment | Already exported in current shell |
+| 2 | Config file | `~/.config/reddit-cli/.env` — dotenv format, no `export` needed |
+| 3 | Secrets file | `~/.secrets` — shell export format |
+| 4 | Shell rc files | `~/.zshenv`, `~/.zshrc`, `~/.zshprofile`, `~/.profile`, `~/.bash_profile`, `~/.bashrc`, `~/.env` |
 
-## Roadmap
+**Color control:** `REDDIT_CLI_NO_COLOR=1` or the standard `NO_COLOR` env var disables ANSI output unconditionally. Color is also automatically suppressed when stdout is not a TTY.
 
-- [ ] `user` subcommand — fetch a user's recent post and comment history
-- [ ] `trending` subcommand — surface rising posts across selected subreddits
-- [ ] `--enrich` depth control (configurable comment limit, include nested replies)
-- [ ] Result caching to avoid redundant API calls in scripted workflows
-- [ ] Config file for persistent defaults (subreddit, sort, limit)
-
-## Acknowledgments
-
-- [PRAW](https://github.com/praw-dev/praw) — the Python Reddit API Wrapper that powers all data fetching
-- [python-dotenv](https://github.com/theskumar/python-dotenv) — credential file loading
-
-## License
+## 📄 License
 
 MIT — see [LICENSE](LICENSE) for details.
